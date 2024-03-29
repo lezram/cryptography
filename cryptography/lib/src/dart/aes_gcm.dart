@@ -80,19 +80,18 @@ class DartAesGcm extends AesGcm with DartAesMixin {
     required SecretKey secretKey,
     List<int> aad = const <int>[],
     Uint8List? possibleBuffer,
+    int macSize = 16,
   }) async {
     final secretKeyData = await secretKey.extract();
-    return decryptSync(
-      secretBox,
-      secretKeyData: secretKeyData,
-      aad: aad,
-    );
+    return decryptSync(secretBox,
+        secretKeyData: secretKeyData, aad: aad, macSize: macSize);
   }
 
   List<int> decryptSync(
     SecretBox secretBox, {
     required SecretKeyData secretKeyData,
     List<int> aad = const <int>[],
+    int macSize = 16,
   }) {
     final actualSecretKeyLength = secretKeyData.bytes.length;
     final expectedSecretKeyLength = secretKeyLength;
@@ -121,13 +120,17 @@ class DartAesGcm extends AesGcm with DartAesMixin {
     // Calculate MAC
     final cipherText = secretBox.cipherText;
     final mac = secretBox.mac;
-    final calculatedMac = const DartGcm()._calculateMacSync(
+    Mac calculatedMac = const DartGcm()._calculateMacSync(
       cipherText,
       aad: aad,
       expandedKey: expandedKey,
       h: h,
       precounterBlock: state,
     );
+
+    if (calculatedMac.bytes.length > macSize) {
+      calculatedMac = Mac(calculatedMac.bytes.sublist(0, macSize));
+    }
 
     // Check MAC is correct
     if (calculatedMac != mac) {
